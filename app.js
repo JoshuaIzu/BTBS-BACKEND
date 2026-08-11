@@ -18,7 +18,7 @@ app.get("/", (req, res) => {
 
 app.use(
   cors({
-    origin: ("https://behindthebusstop.vercel.app", "https://localhost:5173"),
+    origin: ("https://behindthebusstop.vercel.app", "http://localhost:5173"),
     credentials: true,
   }),
 );
