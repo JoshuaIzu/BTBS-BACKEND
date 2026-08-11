@@ -18,10 +18,12 @@ app.get("/", (req, res) => {
 
 app.use(
   cors({
-    origin: ("https://behindthebusstop.vercel.app",
-      "http://localhost:5173"),
-    credentials: true,
-  }),
+    origin: [
+      "http://localhost:5173",
+      "https://behindthebusstop.vercel.app"
+    ],
+    credentials: true
+  })
 );
 
 app.use("/api/auth", require("./src/routes/auth.routes"));
