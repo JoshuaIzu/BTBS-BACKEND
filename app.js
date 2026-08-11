@@ -16,6 +16,13 @@ app.get("/", (req, res) => {
   res.send("Welcome to BTBS...");
 });
 
+app.use(
+  cors({
+    origin: ("https://behindthebusstop.vercel.app", "https://localhost:5173"),
+    credentials: true,
+  }),
+);
+
 app.use("/api/auth", require("./src/routes/auth.routes"));
 app.use("/api/routes", require("./src/routes/route.routes"));
 app.use("/api/confirmations", require("./src/routes/confirmation.routes"));
