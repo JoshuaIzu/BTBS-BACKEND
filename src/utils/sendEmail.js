@@ -1,74 +1,37 @@
-// const nodemailer = require('nodemailer');
-// const ejs = require('ejs');
-// const path = require('path');
+const { BrevoClient } = require("@getbrevo/brevo");
 
-// const sendEmail = async (to, subject, text, options = {}) => {
-//     try {
-//         const transporter = nodemailer.createTransport({
-//             service: 'Gmail',
-//             auth: {
-//                 user: process.env.EMAIL_USER,
-//                 pass: process.env.EMAIL_PASS,
-//             },
-//         });
-
-//         let html;
-//         if (options.template) {
-//             const templatePath = path.join(__dirname, '..', '..', 'views', 'emails', options.template);
-//             html = await ejs.renderFile(templatePath, options.data || {});
-//         }
-
-//         const mailOptions = {
-//             from: process.env.EMAIL_USER,
-//             to,
-//             subject,
-//             text,
-//             html,
-//         };
-
-//         await transporter.sendMail(mailOptions);
-//     } catch (error) {
-//         console.error('Error sending email:', error);
-//         throw new Error('Failed to send email');
-//     }
-// };
-
-// module.exports = sendEmail;
-
-
-
-const nodemailer = require("nodemailer");
+const client = new BrevoClient({
+    apiKey: process.env.BREVO_API_KEY,
+});
 
 const sendEmail = async (options) => {
     try {
-        const transporter = nodemailer.createTransport({
-            host: process.env.MAIL_SERVER,
-            port: parseInt(process.env.MAIL_PORT), // Good practice to parse string to integer
-            secure: process.env.MAIL_SECURE === 'true',
-            auth: {
-                user: process.env.MAIL_USER,
-                pass: process.env.MAIL_PASS,
+        const response = await client.transactionalEmails.sendTransacEmail({
+            sender: {
+                name: "BTBS",
+                email: process.env.BREVO_SENDER_EMAIL,
             },
+
+            to: [
+                {
+                    email: options.email,
+                },
+            ],
+
+            subject: options.subject,
+
+            htmlContent: options.html,
+
+            textContent: options.text,
         });
 
-        const message = {
-            from: `Developer <${process.env.MAIL_USER}>`,
-            to: options.email,
-            subject: options.subject,
-            html: options.html,
-            text: options.text,
-        };
+        console.log("Email sent successfully:", response);
 
-        const info = await transporter.sendMail(message);
-        console.log("Message sent successfully: %s", info.messageId);
-        return info;
-
+        return response;
     } catch (error) {
-        console.error("Nodemailer failed. Attempting fallback method...", error.message);
+        console.error("Brevo email error:", error);
 
-        // Call your Resend fallback logic here
-        // const fallbackInfo = await sendWithResend(options);
-        // return fallbackInfo;
+        throw new Error("Failed to send email");
     }
 };
 
