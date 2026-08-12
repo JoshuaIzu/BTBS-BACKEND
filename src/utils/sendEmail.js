@@ -37,35 +37,39 @@
 
 
 
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const sendEmail = async (to, subject, text, options = {}) => {
+const sendEmail = async (options) => {
     try {
-        const { data, error } = await resend.emails.send({
-            from: process.env.EMAIL_FROM,
-            to: [to],
-            subject: subject,
-            text: text,
-            html: options.html || `<p>${text}</p>`,
+        const transporter = nodemailer.createTransport({
+            host: process.env.MAIL_SERVER,
+            port: parseInt(process.env.MAIL_PORT), // Good practice to parse string to integer
+            secure: process.env.MAIL_SECURE === 'true',
+            auth: {
+                user: process.env.MAIL_USER,
+                pass: process.env.MAIL_PASS,
+            },
         });
 
-        if (error) {
-            console.error("Resend error:", error);
+        const message = {
+            from: `Developer <${process.env.MAIL_USER}>`,
+            to: options.email,
+            subject: options.subject,
+            html: options.html,
+            text: options.text,
+        };
 
-            throw new Error(error.message || "Failed to send email");
-        }
+        const info = await transporter.sendMail(message);
+        console.log("Message sent successfully: %s", info.messageId);
+        return info;
 
-        console.log("Email sent successfully:", data.id);
-
-        return data;
     } catch (error) {
-        console.error("Error sending email:", error);
+        console.error("Nodemailer failed. Attempting fallback method...", error.message);
 
-        throw new Error("Failed to send email");
+        // Call your Resend fallback logic here
+        // const fallbackInfo = await sendWithResend(options);
+        // return fallbackInfo;
     }
 };
 
 module.exports = sendEmail;
-
