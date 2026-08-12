@@ -1,4 +1,5 @@
 const User = require("../models/user.model");
+const Business = require("../models/business.model");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const generateToken = require("../utils/generateToken");
@@ -82,7 +83,7 @@ const registerBusiness = async (req, res) => {
 
     const { otp, otpExpiresAt } = generateOTP();
 
-    const business = await User.create({
+    const user = await User.create({
       businessName,
       email,
       password: hashedPassword,
@@ -91,6 +92,18 @@ const registerBusiness = async (req, res) => {
       otp,
       otpExpiry: otpExpiresAt,
     });
+
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + 7);
+
+    const business = await Business.create({
+      ownerId: user._id,
+      businessName,
+      category,
+      trialStartDate: new Date(),
+      trialEndDate,
+      subscriptionStatus: "trial"
+    })
 
     sendEmail(
       email,
@@ -114,7 +127,8 @@ const registerBusiness = async (req, res) => {
         businessName: business.businessName,
         email: business.email,
         category: business.category,
-        role: business.role,
+        subscriptionStatus: business.subscriptionStatus,
+        trialEndDate: business.trialEndDate,
       },
     });
   } catch (error) {
