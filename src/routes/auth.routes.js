@@ -31,6 +31,20 @@ router.post(
   validate,
   authController.verifyOtp,
 );
+
+router.post(
+  "/forgot-password",
+  validate,
+  authValidator.forgotPasswordValidation,
+  authController.forgotPassword
+);
+
+router.post(
+  "/reset-password",
+  validate,
+  authValidator.resetPasswordValidation,
+  authController.resetPassword
+);
 router.post("/resend-otp", authController.resendOtp);
 
 router.get("/profile", protect, authController.profile);

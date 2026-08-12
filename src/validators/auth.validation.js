@@ -47,9 +47,34 @@ const verifyOtpValidation = [
   body("otp").isLength({ min: 6, max: 6 }).withMessage("OTP must be 6 digits"),
 ];
 
+const forgotPasswordValidation = [
+  body("email")
+    .isEmail()
+    .withMessage("Valid email is required")
+    .normalizeEmail(),
+];
+
+const resetPasswordValidation = [
+  body("email")
+    .isEmail()
+    .withMessage("Valid email is required")
+    .normalizeEmail(),
+
+  body("otp")
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage("OTP must be 6 digits"),
+
+  body("newPassword")
+    .isLength({ min: 6 })
+    .withMessage("Password must be at least 6 characters"),
+];
+
 module.exports = {
   commuterRegisterValidation,
   businessRegisterValidation,
   loginValidation,
   verifyOtpValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation,
 };
