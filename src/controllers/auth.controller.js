@@ -342,9 +342,15 @@ const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
     const user = await User.findOne({ email });
 
-    // Don't reveal whether the email exists
     if (!user) {
       return res.status(200).json({
         success: true,
@@ -359,11 +365,11 @@ const forgotPassword = async (req, res) => {
 
     await user.save();
 
-    sendEmail(
+    await sendEmail(
       email,
       "BTBS Password Reset OTP",
       `Your BTBS password reset OTP is ${otp}.
-
+      
 This OTP expires at ${otpExpiresAt.toLocaleString()}.
 
 If you did not request a password reset, please ignore this email.`
@@ -388,6 +394,20 @@ If you did not request a password reset, please ignore this email.`
 const resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, OTP and new password are required",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
+    }
 
     const user = await User.findOne({ email });
 
@@ -426,7 +446,7 @@ const resetPassword = async (req, res) => {
 
     user.password = hashedPassword;
 
-    // Clear reset OTP after successful reset
+    // Delete OTP after successful password reset
     user.resetPasswordOtp = undefined;
     user.resetPasswordOtpExpiry = undefined;
 
@@ -448,6 +468,69 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const verifyResetOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check that a reset OTP exists
+    if (!user.resetPasswordOtp) {
+      return res.status(400).json({
+        success: false,
+        message: "No password reset OTP requested",
+      });
+    }
+
+    // Check OTP
+    if (user.resetPasswordOtp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
+
+    // Check expiry
+    if (
+      !user.resetPasswordOtpExpiry ||
+      user.resetPasswordOtpExpiry < new Date()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired",
+      });
+    }
+
+    // OTP is valid
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified successfully. You can now reset your password.",
+    });
+
+  } catch (error) {
+    console.error("Verify reset OTP error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error verifying reset OTP",
+      error: error.message,
+    });
+  }
+};
 module.exports = {
   registerCommuter,
   registerBusiness,
@@ -458,4 +541,5 @@ module.exports = {
   resendOtp,
   forgotPassword,
   resetPassword,
+  verifyResetOtp,
 };

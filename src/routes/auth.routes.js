@@ -47,6 +47,11 @@ router.post(
 );
 router.post("/resend-otp", authController.resendOtp);
 
+router.post(
+  "/verify-reset-otp",
+  authController.verifyResetOtp
+);
+
 router.get("/profile", protect, authController.profile);
 
 module.exports = router;
