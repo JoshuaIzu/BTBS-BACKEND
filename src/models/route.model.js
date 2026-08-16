@@ -1,54 +1,127 @@
-const mongoose = require('mongoose');
+console.log("🔥🔥🔥 ROUTE MODEL FILE LOADED 🔥🔥🔥");
+const mongoose = require("mongoose");
 
-const routeSchema = new mongoose.Schema({
-    origin: {
-        type: String,
-        required: true,
-    },
-    destination: {
-        type: String,
-        required: true,
-    },
-    vehicleType: {
-        type: String,
-        required: true,
-        lowercase: true,
-        enum: ['bus', 'keke', 'taxi', 'train'],
-    },
-    fareLow: {
-        type: Number,
-        required: true,
-        min: 0,
-    },
-    fareHigh: {
-        type: Number,
-        required: true,
-        min: 0,
-    },
-    averageFare: {
-        type: Number,
-        min: 0,
-    },
-    confidenceScore: {
-        type: Number,
-    },
-    confidenceLevel: {
-        type: String,
-        enum: ['High', 'Medium', 'Low'],
-        default: 'Low',
-    },
-    lastConfirmedAt: {
-        type: Date,
-    }, 
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-    },
+const routeSchema = new mongoose.Schema(
+    {
+        origin: {
+            placeId: {
+                type: String,
+                required: true,
+            },
+            name: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+        },
 
-});
+        destination: {
+            placeId: {
+                type: String,
+                required: true,
+            },
+            name: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+        },
+
+        vehicleType: {
+            type: String,
+            enum: ["bus", "keke", "taxi"],
+            required: true,
+        },
+
+        boardingPoint: {
+            placeId: {
+                type: String,
+            },
+            name: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+        },
+
+        transferPoint: {
+            placeId: {
+                type: String,
+            },
+            name: {
+                type: String,
+                trim: true,
+            },
+        },
+
+        dropOffPoint: {
+            placeId: {
+                type: String,
+            },
+            name: {
+                type: String,
+                required: true,
+                trim: true,
+            },
+        },
+
+        fareLow: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+
+        fareHigh: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+
+        averageFare: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+
+        totalConfirmations: {
+            type: Number,
+            default: 0,
+        },
+
+        confidenceScore: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 100,
+        },
+
+        confidenceLevel: {
+            type: String,
+            enum: ["High", "Medium", "Unconfirmed"],
+            default: "Unconfirmed",
+        },
+
+        lastConfirmedAt: {
+            type: Date,
+        },
+
+        createdBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+        },
+    },
+    {
+        timestamps: true,
+    }
+);
+
 routeSchema.index({
-    destination: 1
+    "origin.placeId": 1,
+    "destination.placeId": 1,
+    vehicleType: 1,
+    confidenceScore: -1,
 });
 
-module.exports = mongoose.model('Route', routeSchema);
+
+
+module.exports = mongoose.model("Route", routeSchema);
