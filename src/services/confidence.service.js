@@ -1,306 +1,422 @@
 const Confirmation = require("../models/confirmation.model");
 
-/**
- * Calculate the median of an array of numbers
- */
+
+// ==========================================
+// CALCULATE MEDIAN
+// ==========================================
+
 const calculateMedian = (numbers) => {
-    if (!numbers.length) return 0;
 
-    const sorted = [...numbers].sort((a, b) => a - b);
+    if (!numbers.length) {
+        return 0;
+    }
 
-    const middle = Math.floor(sorted.length / 2);
+    const sorted = [...numbers].sort(
+        (a, b) => a - b
+    );
+
+    const middle =
+        Math.floor(sorted.length / 2);
 
     if (sorted.length % 2 === 0) {
-        return (sorted[middle - 1] + sorted[middle]) / 2;
+
+        return (
+            (sorted[middle - 1] +
+                sorted[middle]) /
+            2
+        );
     }
 
     return sorted[middle];
 };
 
 
-/**
- * Calculate confidence score for a route
- */
-const calculateConfidence = async (routeId) => {
-    try {
-        const now = new Date();
+// ==========================================
+// CALCULATE CONFIDENCE SCORE
+// ==========================================
+
+const calculateConfidenceScore = async (
+    routeId,
+    referenceTime = new Date()
+) => {
+
+    // ======================================
+    // 7-DAY WINDOW
+    // ======================================
+
+    const sevenDaysAgo = new Date(
+        referenceTime.getTime() -
+        168 * 60 * 60 * 1000
+    );
 
 
-        // 1. GET CONFIRMATIONS FROM LAST 48 HOURS
+    // ======================================
+    // GET REPORTS IN WINDOW
+    // ======================================
 
-
-        const fortyEightHoursAgo = new Date(
-            now.getTime() - 48 * 60 * 60 * 1000
-        );
-
-        let confirmations = await Confirmation.find({
+    const reports =
+        await Confirmation.find({
             routeId,
+
             confirmedAt: {
-                $gte: fortyEightHoursAgo,
+                $gte: sevenDaysAgo,
+                $lte: referenceTime,
             },
         }).lean();
 
 
-        // ==========================================
-        // 2. FALLBACK TO LAST 7 DAYS
-        // ==========================================
+    // ======================================
+    // NO REPORTS
+    // ======================================
 
-        if (confirmations.length < 10) {
-            const sevenDaysAgo = new Date(
-                now.getTime() - 7 * 24 * 60 * 60 * 1000
-            );
+    if (reports.length === 0) {
 
-            confirmations = await Confirmation.find({
-                routeId,
-                confirmedAt: {
-                    $gte: sevenDaysAgo,
-                },
-            }).lean();
-        }
+        return {
+            score: 0,
 
+            level: "Unconfirmed",
 
-        // ==========================================
-        // 3. NO DATA
-        // ==========================================
+            components: {
+                reportStrength: 0,
+                fareAgreement: 0,
+                dataFreshness: 0,
+                fareFairness: 0,
+                overchargeEvidence: 0,
+                easeFindingTransport: 0,
+            },
 
-        if (confirmations.length === 0) {
-            return {
-                score: 0,
-                level: "Unconfirmed",
-                components: {
-                    reportStrength: 0,
-                    fareAgreement: 0,
-                    dataFreshness: 0,
-                    fareFairness: 0,
-                    overchargeEvidence: 0,
-                    easeFindingTransport: 0,
-                },
-            };
-        }
+            reportCount: 0,
+        };
+    }
 
 
-        // ==========================================
-        // 4. REPORT STRENGTH
-        // ==========================================
+    // ======================================
+    // 1. REPORT STRENGTH — 20%
+    //
+    // report_count ÷ 20
+    // capped at 100%
+    // ======================================
 
-        const uniqueUsers = new Set(
-            confirmations.map(
-                (confirmation) =>
-                    confirmation.userId.toString()
-            )
-        );
+    const reportCount =
+        reports.length;
 
-        const independentReports =
-            uniqueUsers.size;
-
-        const reportStrength = Math.min(
-            (independentReports / 20) * 100,
+    const reportStrength =
+        Math.min(
+            (reportCount / 20) * 100,
             100
         );
 
 
-        // ==========================================
-        // 5. FARE AGREEMENT
-        // ==========================================
+    // ======================================
+    // 2. FARE AGREEMENT — 30%
+    //
+    // Median fare is reference.
+    // Count reports within ±10%.
+    // ======================================
 
-        const fares = confirmations.map(
-            (confirmation) =>
-                confirmation.confirmedFare
+    const fares =
+        reports.map(
+            report => report.confirmedFare
         );
 
-        const medianFare = calculateMedian(fares);
+    const medianFare =
+        calculateMedian(fares);
 
-        const lowerLimit = medianFare * 0.90;
-        const upperLimit = medianFare * 1.10;
 
-        const agreeingReports = confirmations.filter(
-            (confirmation) =>
-                confirmation.confirmedFare >= lowerLimit &&
-                confirmation.confirmedFare <= upperLimit
+    const lowerFare =
+        medianFare * 0.90;
+
+    const upperFare =
+        medianFare * 1.10;
+
+
+    const agreeingReports =
+        reports.filter(
+            report =>
+                report.confirmedFare >=
+                lowerFare &&
+                report.confirmedFare <=
+                upperFare
         ).length;
 
-        const fareAgreement =
-            (agreeingReports / confirmations.length) *
-            100;
+
+    const fareAgreement =
+        (agreeingReports /
+            reportCount) *
+        100;
 
 
-        // ==========================================
-        // 6. DATA FRESHNESS
-        // ==========================================
+    // ======================================
+    // 3. DATA FRESHNESS — 15%
+    //
+    // 100 - (hours_old / 168 × 100)
+    // floored at 0
+    // ======================================
 
-        const newestConfirmation = confirmations.reduce(
-            (latest, confirmation) => {
-                const confirmationDate =
-                    new Date(confirmation.confirmedAt);
+    const mostRecentReport =
+        reports.reduce(
+            (latest, report) => {
 
-                return confirmationDate > latest
-                    ? confirmationDate
+                const reportDate =
+                    new Date(
+                        report.confirmedAt
+                    );
+
+                return reportDate >
+                    latest
+                    ? reportDate
                     : latest;
+
             },
             new Date(0)
         );
 
-        const ageHours =
-            (now - newestConfirmation) /
-            (1000 * 60 * 60);
 
-        const dataFreshness = Math.max(
+    const hoursOld =
+        Math.max(
             0,
-            Math.min(
-                100,
-                ((168 - ageHours) / 168) * 100
-            )
+            (
+                referenceTime -
+                mostRecentReport
+            ) /
+            (1000 * 60 * 60)
         );
 
 
-        // ==========================================
-        // 7. FARE FAIRNESS
-        // ==========================================
-
-        const fairnessTotal =
-            confirmations.reduce(
-                (sum, confirmation) =>
-                    sum +
-                    (confirmation.fareFairness || 0),
-                0
-            );
-
-        const fareFairness =
+    const dataFreshness =
+        Math.max(
+            100 -
             (
-                fairnessTotal /
-                confirmations.length /
-                5
-            ) * 100;
+                (hoursOld / 168) *
+                100
+            ),
+            0
+        );
 
 
-        // ==========================================
-        // 8. OVERCHARGE EVIDENCE
-        // ==========================================
+    // ======================================
+    // 4. FARE FAIRNESS — 15%
+    //
+    // (average - 1) / 4 × 100
+    // ======================================
 
-        const overchargedReports =
-            confirmations.filter(
-                (confirmation) =>
-                    confirmation.everOvercharged === true
+    const fairnessReports =
+        reports.filter(
+            report =>
+                typeof report.fareFairness ===
+                "number"
+        );
+
+
+    let fareFairness = 0;
+
+
+    if (fairnessReports.length > 0) {
+
+        const averageFairness =
+            fairnessReports.reduce(
+                (sum, report) =>
+                    sum +
+                    report.fareFairness,
+                0
+            ) /
+            fairnessReports.length;
+
+
+        fareFairness =
+            (
+                (averageFairness - 1) /
+                4
+            ) *
+            100;
+    }
+
+
+    // ======================================
+    // 5. OVERCHARGE EVIDENCE — 10%
+    //
+    // 100% - percentage of Yes
+    // ======================================
+
+    const overchargeReports =
+        reports.filter(
+            report =>
+                report.overcharged === "Yes" ||
+                report.overcharged === "No"
+        );
+
+
+    let overchargeEvidence = 0;
+
+
+    if (overchargeReports.length > 0) {
+
+        const yesReports =
+            overchargeReports.filter(
+                report =>
+                    report.overcharged ===
+                    "Yes"
             ).length;
+
 
         const overchargePercentage =
             (
-                overchargedReports /
-                confirmations.length
-            ) * 100;
-
-        const overchargeEvidence =
-            100 - overchargePercentage;
+                yesReports /
+                overchargeReports.length
+            ) *
+            100;
 
 
-        // ==========================================
-        // 9. EASE FINDING TRANSPORT
-        // ==========================================
-
-        const easeTotal =
-            confirmations.reduce(
-                (sum, confirmation) =>
-                    sum +
-                    (confirmation.easeFindingTransport || 0),
-                0
-            );
-
-        const easeFindingTransport =
-            (
-                easeTotal /
-                confirmations.length /
-                5
-            ) * 100;
+        overchargeEvidence =
+            100 -
+            overchargePercentage;
+    }
 
 
-        // ==========================================
-        // 10. FINAL CONFIDENCE SCORE
-        // ==========================================
+    // ======================================
+    // 6. EASE FINDING TRANSPORT — 10%
+    //
+    // (average - 1) / 4 × 100
+    // ======================================
 
-        const score =
-            reportStrength * 0.20 +
-            fareAgreement * 0.30 +
-            dataFreshness * 0.15 +
-            fareFairness * 0.15 +
-            overchargeEvidence * 0.10 +
-            easeFindingTransport * 0.10;
-
-
-        const roundedScore =
-            Math.round(score * 100) / 100;
-
-
-        // ==========================================
-        // 11. CONFIDENCE LEVEL
-        // ==========================================
-
-        let level;
-
-        if (roundedScore >= 80) {
-            level = "High";
-        } else if (roundedScore >= 60) {
-            level = "Medium";
-        } else {
-            level = "Unconfirmed";
-        }
-
-
-        // ==========================================
-        // 12. RETURN RESULTS
-        // ==========================================
-
-        return {
-            score: roundedScore,
-            level,
-
-            components: {
-                reportStrength:
-                    Math.round(
-                        reportStrength * 100
-                    ) / 100,
-
-                fareAgreement:
-                    Math.round(
-                        fareAgreement * 100
-                    ) / 100,
-
-                dataFreshness:
-                    Math.round(
-                        dataFreshness * 100
-                    ) / 100,
-
-                fareFairness:
-                    Math.round(
-                        fareFairness * 100
-                    ) / 100,
-
-                overchargeEvidence:
-                    Math.round(
-                        overchargeEvidence * 100
-                    ) / 100,
-
-                easeFindingTransport:
-                    Math.round(
-                        easeFindingTransport * 100
-                    ) / 100,
-            },
-
-            independentReports,
-            totalReports: confirmations.length,
-            medianFare,
-        };
-
-    } catch (error) {
-        console.error(
-            "🔥 CONFIDENCE CALCULATION ERROR:",
-            error
+    const easeReports =
+        reports.filter(
+            report =>
+                typeof report.easeFindingTransport ===
+                "number"
         );
 
-        throw error;
+
+    let easeFindingTransport = 0;
+
+
+    if (easeReports.length > 0) {
+
+        const averageEase =
+            easeReports.reduce(
+                (sum, report) =>
+                    sum +
+                    report.easeFindingTransport,
+                0
+            ) /
+            easeReports.length;
+
+
+        easeFindingTransport =
+            (
+                (averageEase - 1) /
+                4
+            ) *
+            100;
     }
+
+
+    // ======================================
+    // FINAL CONFIDENCE SCORE
+    // ======================================
+
+    const score =
+        (
+            reportStrength * 0.20
+        ) +
+
+        (
+            fareAgreement * 0.30
+        ) +
+
+        (
+            dataFreshness * 0.15
+        ) +
+
+        (
+            fareFairness * 0.15
+        ) +
+
+        (
+            overchargeEvidence * 0.10
+        ) +
+
+        (
+            easeFindingTransport * 0.10
+        );
+
+
+    const finalScore =
+        Math.round(score);
+
+
+    // ======================================
+    // CONFIDENCE LEVEL
+    // ======================================
+
+    let level;
+
+    if (finalScore >= 70) {
+
+        level = "High";
+
+    } else if (finalScore >= 40) {
+
+        level = "Medium";
+
+    } else {
+
+        level = "Unconfirmed";
+    }
+
+
+    // ======================================
+    // RETURN EVERYTHING
+    // ======================================
+
+    return {
+
+        score: finalScore,
+
+        level,
+
+        components: {
+
+            reportStrength:
+                Math.round(
+                    reportStrength
+                ),
+
+            fareAgreement:
+                Math.round(
+                    fareAgreement
+                ),
+
+            dataFreshness:
+                Math.round(
+                    dataFreshness
+                ),
+
+            fareFairness:
+                Math.round(
+                    fareFairness
+                ),
+
+            overchargeEvidence:
+                Math.round(
+                    overchargeEvidence
+                ),
+
+            easeFindingTransport:
+                Math.round(
+                    easeFindingTransport
+                ),
+        },
+
+        reportCount,
+
+        medianFare,
+
+        mostRecentReport,
+    };
 };
 
 
 module.exports = {
-    calculateConfidence,
+    calculateConfidenceScore,
 };

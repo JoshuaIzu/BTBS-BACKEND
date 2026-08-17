@@ -1,6 +1,6 @@
 const Confirmation = require('../models/confirmation.model');
 const Route = require('../models/route.model')
-const { calculateConfidence } = require("../services/confidence.service");
+const { calculateConfidenceScore } = require("../services/confidence.service");
 
 const createConfirmation = async (req, res) => {
     try {
@@ -8,7 +8,7 @@ const createConfirmation = async (req, res) => {
             routeId,
             confirmedFare,
             fareFairness,
-            everOvercharged,
+            Overcharged,
             easeFindingTransport,
             notes,
         } = req.body;
@@ -124,15 +124,17 @@ const createConfirmation = async (req, res) => {
                 confirmedFare: Number(confirmedFare),
                 confirmedAt: new Date(),
 
-                fareFairness: Number(
-                    fareFairness
-                ),
+                fareFairness:
+                    fareFairness !== undefinded
+                        ? Number(fareFairness)
+                        : undefinded,
 
                 everOvercharged,
 
-                easeFindingTransport: Number(
-                    easeFindingTransport
-                ),
+                easeFindingTransport:
+                    easeFindingTransport !== undefined
+                        ? Number(easeFindingTransport)
+                        : undefined,
 
                 isVerified: false,
                 reportSource: "user",
@@ -184,10 +186,9 @@ const createConfirmation = async (req, res) => {
         const confidence =
             await calculateConfidence(routeId);
 
-        route.confidenceScore = 0;
+        route.confidenceScore = confidence.score;
 
-        route.confidenceLevel =
-            "Unconfirmed";
+        route.confidenceLevel = confidence.level;
 
         await route.save();
 
