@@ -34,7 +34,9 @@ app.use("/api/confirmations", require("./src/routes/confirmation.routes"));
 app.use("/api/safety-points", require("./src/routes/safetyPoint.routes"));
 app.use("/api/locations/search", require("./src/routes/search.routes"));
 app.use("/api/reports", require("./src/routes/report.routes"));
-app.use("/api", require("./src/routes/search.routes"))
+app.use("/api", require("./src/routes/search.routes"));
+app.use("/api/trips", require("./src/routes/trip.routes"));
+
 
 app.listen(PORT, () => {
   connectDB();
