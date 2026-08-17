@@ -32,7 +32,9 @@ app.use("/api/auth", require("./src/routes/auth.routes"));
 app.use("/api/routes", require("./src/routes/route.routes"));
 app.use("/api/confirmations", require("./src/routes/confirmation.routes"));
 app.use("/api/safety-points", require("./src/routes/safetyPoint.routes"));
-app.use("/api/locations/search", require("./src/routes/search.routes"))
+app.use("/api/locations/search", require("./src/routes/search.routes"));
+app.use("/api/reports", require("./src/routes/report.routes"));
+app.use("/api", require("./src/routes/search.routes"))
 
 app.listen(PORT, () => {
   connectDB();

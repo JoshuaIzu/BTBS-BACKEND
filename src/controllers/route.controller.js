@@ -96,17 +96,15 @@ const createRoute = async (req, res) => {
 // ==========================================
 
 const searchRoutes = async (req, res) => {
+    console.log("🔥 searchRoutes HIT");
+    console.log("QUERY:", req.query);
+
     try {
         const {
             originPlaceId,
             destinationPlaceId,
             vehicleType,
         } = req.query;
-
-        console.log("🔎 ROUTE SEARCH");
-        console.log("Origin:", originPlaceId);
-        console.log("Destination:", destinationPlaceId);
-        console.log("Vehicle:", vehicleType);
 
         // =========================
         // VALIDATION
@@ -135,33 +133,136 @@ const searchRoutes = async (req, res) => {
             "destination.placeId": destinationPlaceId,
         };
 
-        // Vehicle type is optional
         if (vehicleType) {
-            filter.vehicleType = vehicleType.toLowerCase();
+            filter.vehicleType =
+                vehicleType.toLowerCase();
         }
 
         // =========================
-        // SEARCH DATABASE
+        // FIND ROUTES
         // =========================
 
         const routes = await Route.find(filter)
-            .sort({
-                confidenceScore: -1,
-                lastConfirmedAt: -1,
-            })
             .lean();
 
+
+        // ==========================================
+        // BEST ROUTE RECOMMENDATION
+        // ==========================================
+
+        routes.sort((a, b) => {
+
+            // 1. Confidence score
+            if (
+                b.confidenceScore !==
+                a.confidenceScore
+            ) {
+                return (
+                    b.confidenceScore -
+                    a.confidenceScore
+                );
+            }
+
+
+            // 2. Lower average fare
+            if (
+                b.averageFare !==
+                a.averageFare
+            ) {
+                return (
+                    a.averageFare -
+                    b.averageFare
+                );
+            }
+
+
+            // 3. More confirmations
+            return (
+                b.totalConfirmations -
+                a.totalConfirmations
+            );
+        });
         // =========================
-        // NO ROUTES FOUND
+        // FORMAT RESPONSE
         // =========================
 
-        if (routes.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "No routes found for this journey",
-                routes: [],
-            });
-        }
+        const formattedRoutes = routes.map(
+            (route, index) => ({
+                id: route._id,
+                recommended: index === 0,
+
+                origin: {
+                    placeId: route.origin.placeId,
+                    name: route.origin.name,
+                },
+
+                destination: {
+                    placeId: route.destination.placeId,
+                    name: route.destination.name,
+                },
+
+                vehicleType:
+                    route.vehicleType,
+
+                // =====================
+                // ROUTE GUIDANCE
+                // =====================
+
+                guidance: {
+                    boarding:
+                        route.boardingPoint?.name ||
+                        null,
+
+                    transfer:
+                        route.transferPoint?.name ||
+                        null,
+
+                    dropOff:
+                        route.dropOffPoint?.name ||
+                        null,
+                },
+
+                // =====================
+                // FARE
+                // =====================
+
+                fare: {
+                    low: route.fareLow,
+
+                    high: route.fareHigh,
+
+                    average:
+                        route.averageFare,
+                },
+
+                // =====================
+                // CONFIDENCE
+                // =====================
+
+                confidence: {
+                    score:
+                        route.confidenceScore,
+
+                    level:
+                        route.confidenceLevel,
+                },
+
+                // =====================
+                // CONFIRMATIONS
+                // =====================
+
+                totalConfirmations:
+                    route.totalConfirmations,
+
+                lastConfirmedAt:
+                    route.lastConfirmedAt,
+
+                createdAt:
+                    route.createdAt,
+
+                updatedAt:
+                    route.updatedAt,
+            }));
 
         // =========================
         // RESPONSE
@@ -169,49 +270,29 @@ const searchRoutes = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            count: routes.length,
-            routes: routes.map((route) => ({
-                id: route._id,
 
-                origin: route.origin,
+            count:
+                formattedRoutes.length,
 
-                destination: route.destination,
-
-                vehicleType: route.vehicleType,
-
-                boardingPoint: route.boardingPoint,
-
-                transferPoint: route.transferPoint || null,
-
-                dropOffPoint: route.dropOffPoint,
-
-                fare: {
-                    low: route.fareLow,
-                    high: route.fareHigh,
-                    average: route.averageFare,
-                },
-
-                confidence: {
-                    score: route.confidenceScore,
-                    level: route.confidenceLevel,
-                },
-
-                totalConfirmations: route.totalConfirmations,
-
-                lastConfirmedAt: route.lastConfirmedAt,
-
-                createdAt: route.createdAt,
-
-                updatedAt: route.updatedAt,
-            })),
+            routes:
+                formattedRoutes,
         });
+
     } catch (error) {
-        console.error("🔥 SEARCH ROUTES ERROR:", error);
+
+        console.error(
+            "Search routes error:",
+            error
+        );
 
         return res.status(500).json({
             success: false,
-            message: "Error searching routes",
-            error: error.message,
+
+            message:
+                "Error searching routes",
+
+            error:
+                error.message,
         });
     }
 };

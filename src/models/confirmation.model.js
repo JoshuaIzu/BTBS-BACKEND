@@ -33,9 +33,9 @@ const confirmationSchema = new mongoose.Schema(
             max: 5,
         },
 
-        everOvercharged: {
-            type: Boolean,
-            default: false,
+        Overcharged: {
+            type: String,
+            enum: ["Yes", "No"],
         },
 
         easeFindingTransport: {
