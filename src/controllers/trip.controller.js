@@ -431,6 +431,21 @@ const updateTripLocation = async (req, res) => {
 
         await trip.save();
 
+        const io = req.app.get("io");
+
+        io.to(`trip:${trip.shareToken}`).emit(
+            "locationUpdated",
+            {
+                tripId: trip._id,
+
+                latitude,
+                longitude,
+
+                updatedAt:
+                    trip.currentLocation.updatedAt,
+            }
+        );
+
         return res.status(200).json({
             success: true,
             message: "Location updated",
