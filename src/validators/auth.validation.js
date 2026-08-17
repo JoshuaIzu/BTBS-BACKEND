@@ -48,26 +48,29 @@ const verifyOtpValidation = [
 ];
 
 const forgotPasswordValidation = [
-  body("email")
-    .isEmail()
-    .withMessage("Valid email is required")
-    .normalizeEmail(),
+    body("email")
+        .notEmpty()
+        .withMessage("Email is required")
+        .isEmail()
+        .withMessage("Invalid email format"),
 ];
 
 const resetPasswordValidation = [
-  body("email")
-    .isEmail()
-    .withMessage("Valid email is required")
-    .normalizeEmail(),
-
-  body("otp")
-    .isLength({ min: 6, max: 6 })
-    .isNumeric()
-    .withMessage("OTP must be 6 digits"),
-
-  body("newPassword")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters"),
+    body("email")
+        .notEmpty()
+        .withMessage("Email is required")
+        .isEmail()
+        .withMessage("Invalid email format"),
+    body("otp")
+        .notEmpty()
+        .withMessage("OTP is required")
+        .isLength({ min: 6, max: 6 })
+        .withMessage("OTP must be 6 digits"),
+    body("newPassword")
+        .notEmpty()
+        .withMessage("New password is required")
+        .isLength({ min: 6 })
+        .withMessage("Password must be at least 6 characters"),
 ];
 
 module.exports = {

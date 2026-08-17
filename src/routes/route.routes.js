@@ -7,6 +7,8 @@ const routeController = require("../controllers/route.controller");
 
 const RouteValidator = require("../validators/route.validation");
 const validate = require("../middleware/validation.middleware");
+const { validateObjectId } = require("../middleware/objectId.middleware");
+
 
 // ==========================================
 // PUBLIC ROUTES
@@ -14,7 +16,7 @@ const validate = require("../middleware/validation.middleware");
 
 router.get("/search", routeController.searchRoutes);
 
-router.get("/:id", routeController.getRoutesById);
+router.get("/:id", validateObjectId('id'), routeController.getRoutesById);
 
 router.get("/", routeController.getAllRoutes);
 
@@ -25,7 +27,7 @@ router.get("/", routeController.getAllRoutes);
 router.post(
     "/create",
     (req, res, next) => {
-        console.log("🔥🔥🔥 /api/routes/create ROUTE HIT 🔥🔥🔥");
+        console.log("/api/routes/create ROUTE HIT");
         next();
     },
     protect,
@@ -39,6 +41,9 @@ router.put(
     "/:id",
     protect,
     authorize("business", "admin"),
+    validateObjectId('id'),
+    RouteValidator.updateRouteValidation,
+    validate,
     routeController.updateRoute
 );
 
@@ -46,6 +51,7 @@ router.delete(
     "/:id",
     protect,
     authorize("admin"),
+    validateObjectId('id'),
     routeController.deleteRoute
 );
 
