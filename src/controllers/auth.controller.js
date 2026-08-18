@@ -198,7 +198,7 @@ const loginUser = async (req, res) => {
 
   try {
     // Require account type
-    if (!email || !password || !expectedRole) {
+    if (!email || !password) {
       return res.status(400).json({
         message: "Email, password and account type are required",
       });
