@@ -72,13 +72,13 @@ app.get("/", (req, res) => {
           "GET /api/places/search": "Search locations by text query (e.g., ?query=Ikeja)",
           "GET /api/places/nearby": "Search nearby places (e.g., ?latitude=6.6018&longitude=3.3515&type=hospital&radius=3000)"
         }
-        }
-      },
-      authentication: {
-        type: "Bearer Token",
-        header: "Authorization: Bearer <token>",
-        protectedEndpoints: "Most endpoints require valid JWT token"
       }
+    },
+    authentication: {
+      type: "Bearer Token",
+      header: "Authorization: Bearer <token>",
+      protectedEndpoints: "Most endpoints require valid JWT token"
+    }
   });
 });
 
@@ -115,6 +115,10 @@ app.use("/api/safety-points", require("./src/routes/safetyPoint.routes"));
 app.use("/api/locations/search", require("./src/routes/search.routes"));
 app.use("/api/reports", require("./src/routes/report.routes"));
 app.use("/api", require("./src/routes/search.routes"));
+<<<<<<<< < Temporary merge branch 1
+app.use("/api/places", require("./src/routes/googlePlaces.routes"));
+app.use("/api/places", require("./src/routes/googlePlaces.routes"));
+=========
 app.use("/api/trips", require("./src/routes/trip.routes"));
 
 // Socket.IO
