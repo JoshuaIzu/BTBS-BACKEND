@@ -197,42 +197,62 @@ const loginUser = async (req, res) => {
   const { email, password, expectedRole } = req.body;
 
   try {
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password are required" });
+    // Require account type
+    if (!email || !password || !expectedRole) {
+      return res.status(400).json({
+        message: "Email, password and account type are required",
+      });
+    }
+
+    // Only allow valid BTBS roles
+    if (!["commuter", "business"].includes(expectedRole)) {
+      return res.status(400).json({
+        message: "Invalid account type",
+      });
     }
 
     const user = await User.findOne({ email });
+
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
+    // Make sure the account type matches
+    if (user.role !== expectedRole) {
+      if (expectedRole === "business") {
+        return res.status(403).json({
+          success: false,
+          message:
+            "This account is registered as a commuter. Please use the commuter login.",
+        });
+      }
+
+      return res.status(403).json({
+        success: false,
+        message:
+          "This account is registered as a business. Please use the business login.",
+      });
+    }
+
+    // Email verification
     if (!user.isVerified) {
       return res.status(403).json({
         message: "Please verify your email address before logging in",
       });
     }
 
+    // Password verification
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
-    if (expectedRole && user.role !== expectedRole) {
-      if (expectedRole === "business") {
-        return res.status(403).json({
-          success: false,
-          message: "This account is registered as a commuter. Please use the commuter login."
-        });
-      } else {
-        return res.status(403).json({
-          success: false,
-          message: "This account is registered as a business. Please use the vendor login."
-        });
-      }
-    }
-
+    // Generate JWT
     const token = generateToken(user._id, user.role);
 
     const userResponse = {
@@ -243,12 +263,20 @@ const loginUser = async (req, res) => {
       token,
     };
 
-    res.json({ message: "Login successful", user: userResponse });
+    return res.status(200).json({
+      message: "Login successful",
+      user: userResponse,
+    });
+
   } catch (error) {
-    res.status(500).json({ message: "Error logging in", error: error.message });
+    console.error("Login error:", error);
+
+    return res.status(500).json({
+      message: "Error logging in",
+      error: error.message,
+    });
   }
 };
-
 const profile = async (req, res) => {
   try {
     res.status(200).json({
