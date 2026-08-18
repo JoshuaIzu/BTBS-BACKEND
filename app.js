@@ -10,6 +10,8 @@ const app = express();
 
 const connectDB = require("./src/config/db");
 
+connectDB();
+
 // ==========================================
 // MIDDLEWARE
 // ==========================================
