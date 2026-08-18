@@ -194,12 +194,18 @@ const sendLoginOtp = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, expectedRole } = req.body;
 
   try {
-    if (!email || !password) {
+    if (!email || !password || !expectedRole) {
       return res.status(400).json({
-        message: "Email and password are required",
+        message: "Email, password and account type are required",
+      });
+    }
+
+    if (!["commuter", "business"].includes(expectedRole)) {
+      return res.status(400).json({
+        message: "Invalid account type",
       });
     }
 
@@ -208,6 +214,18 @@ const loginUser = async (req, res) => {
     if (!user) {
       return res.status(400).json({
         message: "Invalid credentials",
+      });
+    }
+
+    // VERY IMPORTANT
+    // Make sure the selected path matches the actual account
+    if (user.role !== expectedRole) {
+      return res.status(403).json({
+        success: false,
+        message:
+          expectedRole === "commuter"
+            ? "This account is registered as a vendor. Please use the vendor login."
+            : "This account is registered as a commuter. Please use the commuter login.",
       });
     }
 
