@@ -7,7 +7,7 @@ const validate = require('../middleware/validation.middleware');
 const ConfirmationValidator = require('../validators/confirmation.validation');
 const { validateObjectId } = require("../middleware/objectId.middleware");
 
-// Public routes
+// Public route
 
 router.get("/routes/:routeId", validateObjectId('routeId'), confirmationController.getRouteConfirmations);
 
