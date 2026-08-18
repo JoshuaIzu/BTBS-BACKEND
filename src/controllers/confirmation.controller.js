@@ -337,38 +337,48 @@ const getRouteConfirmations = async (req, res) => {
 };
 
 
-
-
-const deleteRoute = async (req, res) => {
+const updateConfirmation = async (req, res) => {
+    console.log("=== UPDATE CONFIRMATION ===");
+    console.log(req.params);
+    console.log(req.originalUrl);
     try {
-        const route = await Route.findById(req.params.id);
+        const { confirmedFare, verificationStatus } = req.body;
 
-        if (!route) {
-            return res.status(404).json({
-                success: false,
-                message: "Route not found",
-            });
+        console.log('Params:', req.params);
+
+        const confirmation = await Confirmation.findById(req.params.confirmationId);
+        console.log('Found:', confirmation);
+        if (!confirmation) {
+            return res.status(404).json({ message: 'Confirmation not found' });
         }
-
-        // Delete associated confirmations
-        const Confirmation = require('../models/confirmation.model');
-        await Confirmation.deleteMany({ routeId: req.params.id });
-
-        // Delete the route
-        await Route.findByIdAndDelete(req.params.id);
-
-        return res.status(200).json({
-            success: true,
-            message: "Route and associated confirmations deleted successfully",
-        });
+        if (confirmation.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'You are not authorized to update this confirmation' });
+        }
+        confirmation.confirmedFare = req.body.confirmedFare || confirmation.confirmedFare;
+        await confirmation.save();
+        res.status(200).json({ message: 'Confirmation updated', confirmation });
     } catch (error) {
-        console.error("Delete route error:", error);
+        res.status(500).json({ message: 'Error updating confirmation', error });
+    }
+};
 
-        return res.status(500).json({
-            success: false,
-            message: "Error deleting route",
-            error: error.message,
-        });
+
+const deleteConfirmation = async (req, res) => {
+    try {
+        const { confirmationId } = req.params;
+
+        const confirmation = await Confirmation.findById(req.params.confirmationId);
+        if (!confirmation) {
+            return res.status(404).json({ message: 'Confirmation not found' });
+        }
+        if (confirmation.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'You are not authorized to delete this confirmation' });
+        }
+        await confirmation.deleteOne();
+
+        res.status(200).json({ message: 'Confirmation deleted', confirmation });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting confirmation', error });
     }
 };
 
