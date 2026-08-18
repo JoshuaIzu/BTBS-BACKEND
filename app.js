@@ -15,7 +15,6 @@ app.use(morgan("dev"));
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
 
 // ==========================================
 // API DOCUMENTATION
@@ -115,10 +114,7 @@ app.use("/api/safety-points", require("./src/routes/safetyPoint.routes"));
 app.use("/api/locations/search", require("./src/routes/search.routes"));
 app.use("/api/reports", require("./src/routes/report.routes"));
 app.use("/api", require("./src/routes/search.routes"));
-<<<<<<<< < Temporary merge branch 1
 app.use("/api/places", require("./src/routes/googlePlaces.routes"));
-app.use("/api/places", require("./src/routes/googlePlaces.routes"));
-=========
 app.use("/api/trips", require("./src/routes/trip.routes"));
 
 // Socket.IO
