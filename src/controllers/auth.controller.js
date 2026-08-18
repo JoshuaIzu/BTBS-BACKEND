@@ -194,20 +194,12 @@ const sendLoginOtp = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
-  const { email, password, expectedRole } = req.body;
+  const { email, password } = req.body;
 
   try {
-    // Require account type
     if (!email || !password) {
       return res.status(400).json({
-        message: "Email, password and account type are required",
-      });
-    }
-
-    // Only allow valid BTBS roles
-    if (!["commuter", "business"].includes(expectedRole)) {
-      return res.status(400).json({
-        message: "Invalid account type",
+        message: "Email and password are required",
       });
     }
 
@@ -219,31 +211,12 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Make sure the account type matches
-    if (user.role !== expectedRole) {
-      if (expectedRole === "business") {
-        return res.status(403).json({
-          success: false,
-          message:
-            "This account is registered as a commuter. Please use the commuter login.",
-        });
-      }
-
-      return res.status(403).json({
-        success: false,
-        message:
-          "This account is registered as a business. Please use the business login.",
-      });
-    }
-
-    // Email verification
     if (!user.isVerified) {
       return res.status(403).json({
         message: "Please verify your email address before logging in",
       });
     }
 
-    // Password verification
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
@@ -252,7 +225,6 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Generate JWT
     const token = generateToken(user._id, user.role);
 
     const userResponse = {
@@ -277,6 +249,7 @@ const loginUser = async (req, res) => {
     });
   }
 };
+
 const profile = async (req, res) => {
   try {
     res.status(200).json({
