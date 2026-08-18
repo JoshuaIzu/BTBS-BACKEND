@@ -6,7 +6,7 @@ const morgan = require("morgan");
 
 
 const connectDB = require("./src/config/db");
-const { searchRoutes } = require("./src/controllers/route.controller");
+
 
 app.use(morgan("dev"));
 app.use(cors());
@@ -68,10 +68,7 @@ app.get("/", (req, res) => {
         places: {
           "GET /api/places/search": "Search locations by text query (e.g., ?query=Ikeja)",
           "GET /api/places/nearby": "Search nearby places (e.g., ?latitude=6.6018&longitude=3.3515&type=hospital&radius=3000)"
-        },
-        places: {
-          "GET /api/places/search": "Search locations by text query (e.g., ?query=Ikeja)",
-          "GET /api/places/nearby": "Search nearby places (e.g., ?latitude=6.6018&longitude=3.3515&type=hospital&radius=3000)"
+        }
         }
       },
       authentication: {
@@ -79,7 +76,6 @@ app.get("/", (req, res) => {
         header: "Authorization: Bearer <token>",
         protectedEndpoints: "Most endpoints require valid JWT token"
       }
-    }
   });
 });
 
