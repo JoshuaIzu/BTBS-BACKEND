@@ -1,14 +1,51 @@
 const Confirmation = require('../models/confirmation.model');
 const Route = require('../models/route.model')
 const { calculateConfidenceScore } = require("../services/confidence.service");
+const mongoose = require('mongoose');
+
+const recalculateRouteAggregates = async (routeId) => {
+    const confirmations = await Confirmation.find({ routeId });
+
+    if (confirmations.length === 0) {
+        const route = await Route.findById(routeId);
+        if (route) {
+            route.fareLow = 0;
+            route.fareHigh = 0;
+            route.averageFare = 0;
+            route.totalConfirmations = 0;
+            route.confidenceScore = 0;
+            route.confidenceLevel = "Unconfirmed";
+            await route.save();
+        }
+        return;
+    }
+
+    const fares = confirmations.map(item => item.confirmedFare);
+    const fareLow = Math.min(...fares);
+    const fareHigh = Math.max(...fares);
+    const totalFare = fares.reduce((sum, fare) => sum + fare, 0);
+    const averageFare = totalFare / fares.length;
+
+    const confidence = await calculateConfidenceScore(routeId);
+
+    const route = await Route.findById(routeId);
+    if (route) {
+        route.fareLow = fareLow;
+        route.fareHigh = fareHigh;
+        route.averageFare = Math.round(averageFare);
+        route.totalConfirmations = confirmations.length;
+        route.confidenceScore = confidence.score;
+        route.confidenceLevel = confidence.level;
+        await route.save();
+    }
+};
 
 const createConfirmation = async (req, res) => {
     try {
         const {
-            routeId,
             confirmedFare,
             fareFairness,
-            Overcharged,
+            everOvercharged,
             easeFindingTransport,
             notes,
         } = req.body;
@@ -16,6 +53,7 @@ const createConfirmation = async (req, res) => {
         // =========================
         // VALIDATION
         // =========================
+        const routeId = req.params.routeId;
 
         if (!routeId) {
             return res.status(400).json({
@@ -125,9 +163,9 @@ const createConfirmation = async (req, res) => {
                 confirmedAt: new Date(),
 
                 fareFairness:
-                    fareFairness !== undefinded
+                    fareFairness !== undefined
                         ? Number(fareFairness)
-                        : undefinded,
+                        : undefined,
 
                 everOvercharged,
 
@@ -184,7 +222,7 @@ const createConfirmation = async (req, res) => {
             new Date();
 
         const confidence =
-            await calculateConfidence(routeId);
+            await calculateConfidenceScore(routeId);
 
         route.confidenceScore = confidence.score;
 
@@ -275,60 +313,65 @@ const getRouteConfirmations = async (req, res) => {
     console.log("===GET ROUTE CONFIRMATIONS===");
     console.log(req.params);
     try {
-        const confirmations = await Confirmation.find({ routeId: req.params.routeId }).populate('userId', 'fullName email');
+        const { routeId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(routeId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid route ID format'
+            });
+        }
+        const confirmations = await Confirmation.find({ routeId }).populate('userId', 'fullName');
         if (confirmations.length === 0) {
             return res.status(200).json({ success: true, count: 0, message: 'No confirmations found for the specified route' });
         }
         res.status(200).json({ success: true, count: confirmations.length, confirmations });
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching confirmations', error });
+        console.error("Get route confirmations error:", error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching confirmations',
+            error: error.message
+        });
     }
 };
 
-const updateConfirmation = async (req, res) => {
-    console.log("=== UPDATE CONFIRMATION ===");
-    console.log(req.params);
-    console.log(req.originalUrl);
+
+
+
+const deleteRoute = async (req, res) => {
     try {
-        const { confirmedFare, verificationStatus } = req.body;
+        const route = await Route.findById(req.params.id);
 
-        console.log('Params:', req.params);
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: "Route not found",
+            });
+        }
 
-        const confirmation = await Confirmation.findById(req.params.confirmationId);
-        console.log('Found:', confirmation);
-        if (!confirmation) {
-            return res.status(404).json({ message: 'Confirmation not found' });
-        }
-        if (confirmation.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'You are not authorized to update this confirmation' });
-        }
-        confirmation.confirmedFare = req.body.confirmedFare || confirmation.confirmedFare;
-        await confirmation.save();
-        res.status(200).json({ message: 'Confirmation updated', confirmation });
+        // Delete associated confirmations
+        const Confirmation = require('../models/confirmation.model');
+        await Confirmation.deleteMany({ routeId: req.params.id });
+
+        // Delete the route
+        await Route.findByIdAndDelete(req.params.id);
+
+        return res.status(200).json({
+            success: true,
+            message: "Route and associated confirmations deleted successfully",
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating confirmation', error });
+        console.error("Delete route error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Error deleting route",
+            error: error.message,
+        });
     }
 };
 
-
-const deleteConfirmation = async (req, res) => {
-    try {
-        const { confirmationId } = req.params;
-
-        const confirmation = await Confirmation.findById(req.params.confirmationId);
-        if (!confirmation) {
-            return res.status(404).json({ message: 'Confirmation not found' });
-        }
-        if (confirmation.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'You are not authorized to delete this confirmation' });
-        }
-        await confirmation.deleteOne();
-
-        res.status(200).json({ message: 'Confirmation deleted', confirmation });
-    } catch (error) {
-        res.status(500).json({ message: 'Error deleting confirmation', error });
-    }
-};
 
 module.exports = {
     createConfirmation,

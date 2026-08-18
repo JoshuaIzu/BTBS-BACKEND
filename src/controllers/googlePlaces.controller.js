@@ -1,0 +1,92 @@
+const {
+    searchGooglePlaces,
+    searchNearbyPlaces,
+} = require("../services/googleMaps.service");
+
+const isValidLatitude = (value) =>
+    Number.isFinite(value) && value >= -90 && value <= 90;
+
+const isValidLongitude = (value) =>
+    Number.isFinite(value) && value >= -180 && value <= 180;
+
+const searchLocations = async (req, res) => {
+    try {
+        const query = req.query.query?.trim();
+
+        if (!query || query.length < 2) {
+            return res.status(400).json({
+                success: false,
+                message: "Query must contain at least 2 characters",
+            });
+        }
+
+        const places = await searchGooglePlaces(query);
+
+        return res.status(200).json({
+            success: true,
+            count: places.length,
+            places,
+        });
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.message || "Unable to search locations",
+        });
+    }
+};
+
+const searchNearby = async (req, res) => {
+    try {
+        const latitude = Number(req.query.latitude);
+        const longitude = Number(req.query.longitude);
+        const type = req.query.type?.trim().toLowerCase();
+        const requestedRadius = Number(req.query.radius);
+        const radius = Number.isFinite(requestedRadius)
+            ? requestedRadius
+            : 5000;
+
+        if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+            return res.status(400).json({
+                success: false,
+                message: "Valid latitude and longitude are required",
+            });
+        }
+
+        if (!type) {
+            return res.status(400).json({
+                success: false,
+                message: "A place type is required",
+            });
+        }
+
+        if (radius < 1 || radius > 50000) {
+            return res.status(400).json({
+                success: false,
+                message: "Radius must be between 1 and 50000 metres",
+            });
+        }
+
+        const places = await searchNearbyPlaces(
+            latitude,
+            longitude,
+            type,
+            radius
+        );
+
+        return res.status(200).json({
+            success: true,
+            count: places.length,
+            places,
+        });
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.message || "Unable to search nearby places",
+        });
+    }
+};
+
+module.exports = {
+    searchLocations,
+    searchNearby,
+};

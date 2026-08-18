@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const generateToken = require("../utils/generateToken");
 const generateOTP = require("../utils/generateotp");
 const sendEmail = require("../utils/sendEmail");
+const sendEmailBackground = require("../utils/sendEmailBackground");
 
 const registerCommuter = async (req, res) => {
   const { fullName, email, password } = req.body;
@@ -14,6 +15,11 @@ const registerCommuter = async (req, res) => {
     }
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      if (existingUser.role === "business") {
+        return res.status(400).json({
+          message: "An account with this email already exists as a business. Please use a different email or contact support."
+        });
+      }
       return res.status(400).json({ message: "User already exists" });
     }
 
@@ -74,9 +80,12 @@ const registerBusiness = async (req, res) => {
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      return res.status(400).json({
-        message: "Business already exists",
-      });
+      if (existingUser.role === "commuter") {
+        return res.status(400).json({
+          message: "An account with this email already exists as a commuter. Please use a different email or contact support."
+        });
+      }
+      return res.status(400).json({ message: "Business already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -161,14 +170,15 @@ const sendLoginOtp = async (req, res) => {
     user.otpExpiry = otpExpiresAt;
     await user.save();
 
-    sendEmailNoWait(
+    // background email sending
+    sendEmailBackground(
       email,
       "BTBS Sign-In OTP",
       `Your sign-in OTP is ${otp}. It expires at ${otpExpiresAt.toLocaleString()}.`,
       {
         template: "otp-login.ejs",
         data: {
-          name: user.fullName,
+          name: user.fullName || user.businessName,
           otp,
           expiresAt: otpExpiresAt.toLocaleString(),
         },
@@ -184,7 +194,7 @@ const sendLoginOtp = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, expectedRole } = req.body;
 
   try {
     if (!email || !password) {
@@ -208,6 +218,21 @@ const loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
+
+    if (expectedRole && user.role !== expectedRole) {
+      if (expectedRole === "business") {
+        return res.status(403).json({
+          success: false,
+          message: "This account is registered as a commuter. Please use the commuter login."
+        });
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: "This account is registered as a business. Please use the vendor login."
+        });
+      }
+    }
+
     const token = generateToken(user._id, user.role);
 
     const userResponse = {
@@ -351,29 +376,27 @@ const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
 
-    if (!user) {
-      return res.status(200).json({
-        success: true,
-        message: "If the email exists, a password reset OTP has been sent.",
-      });
-    }
+    // Always return success to prevent email enumeration
+    // But only send email if user exists
+    if (user) {
+      const { otp, otpExpiresAt } = generateOTP();
 
-    const { otp, otpExpiresAt } = generateOTP();
+      user.resetPasswordOtp = otp;
+      user.resetPasswordOtpExpiry = otpExpiresAt;
 
-    user.resetPasswordOtp = otp;
-    user.resetPasswordOtpExpiry = otpExpiresAt;
+      await user.save();
 
-    await user.save();
+      // Send email in background - don't block response
+      sendEmailBackground(
+        email,
+        "BTBS Password Reset OTP",
+        `Your BTBS password reset OTP is ${otp}.
 
-    await sendEmail(
-      email,
-      "BTBS Password Reset OTP",
-      `Your BTBS password reset OTP is ${otp}.
-      
 This OTP expires at ${otpExpiresAt.toLocaleString()}.
 
 If you did not request a password reset, please ignore this email.`
-    );
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -421,7 +444,7 @@ const resetPassword = async (req, res) => {
     if (!user.resetPasswordOtp) {
       return res.status(400).json({
         success: false,
-        message: "No password reset request found",
+        message: "No password reset request found. Please request a new OTP.",
       });
     }
 
@@ -438,19 +461,28 @@ const resetPassword = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "OTP has expired",
+        message: "OTP has expired. Please request a new OTP.",
       });
     }
 
+    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
+    // Update password and clear OTP
     user.password = hashedPassword;
-
-    // Delete OTP after successful password reset
     user.resetPasswordOtp = undefined;
     user.resetPasswordOtpExpiry = undefined;
 
     await user.save();
+
+    // Send confirmation email in background
+    sendEmailBackground(
+      email,
+      "BTBS Password Reset Successful",
+      `Your BTBS password has been successfully reset.
+
+If you did not initiate this change, please contact support immediately.`
+    );
 
     return res.status(200).json({
       success: true,
@@ -482,21 +514,19 @@ const verifyResetOtp = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "User not found",
+        message: "Invalid email or OTP",
       });
     }
 
-    // Check that a reset OTP exists
     if (!user.resetPasswordOtp) {
       return res.status(400).json({
         success: false,
-        message: "No password reset OTP requested",
+        message: "No password reset request found",
       });
     }
 
-    // Check OTP
     if (user.resetPasswordOtp !== otp) {
       return res.status(400).json({
         success: false,
@@ -504,7 +534,6 @@ const verifyResetOtp = async (req, res) => {
       });
     }
 
-    // Check expiry
     if (
       !user.resetPasswordOtpExpiry ||
       user.resetPasswordOtpExpiry < new Date()
@@ -515,7 +544,6 @@ const verifyResetOtp = async (req, res) => {
       });
     }
 
-    // OTP is valid
     return res.status(200).json({
       success: true,
       message: "OTP verified successfully. You can now reset your password.",
@@ -526,8 +554,8 @@ const verifyResetOtp = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Error verifying reset OTP",
-      error: error.message,
+      message: "Error verifying OTP",
+      error: error.message
     });
   }
 };
