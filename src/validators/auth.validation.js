@@ -39,6 +39,7 @@ const loginValidation = [
   body("email").isEmail().withMessage("Valid email is required"),
 
   body("password").notEmpty().withMessage("Password is required"),
+  body("expectedRole").optional().isIn(["commuter", "business"]).withMessage("Invalid role")
 ];
 
 const verifyOtpValidation = [

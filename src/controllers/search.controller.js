@@ -1,4 +1,4 @@
-const { searchGooglePlaces, searchNearbyPlaces, } = require("../services/googleMaps.service");
+const { searchGooglePlaces, searchNearbyPlaces } = require("../services/googleMaps.service");
 
 const searchLocations = async (req, res) => {
     try {
@@ -13,62 +13,30 @@ const searchLocations = async (req, res) => {
 
         const places = await searchGooglePlaces(q.trim());
 
-        const results = places.map((place) => ({
-            placeId: place.id,
-
-            name: place.displayName?.text || "",
-
-            address: place.formattedAddress || "",
-
-            location: {
-                latitude: place.location?.latitude ?? null,
-                longitude: place.location?.longitude ?? null,
-            },
-
-            types: place.types || [],
-        }));
-
         return res.status(200).json({
             success: true,
-            count: results.length,
-            results,
+            count: places.length,
+            places,
         });
     } catch (error) {
-        console.error("Location search error:", error);
-
-        return res.status(500).json({
+        return res.status(error.statusCode || 500).json({
             success: false,
-            message: "Error searching locations",
-            error: error.message,
+            message: error.message || "Error searching locations",
         });
     }
 };
 
 const searchNearby = async (req, res) => {
     try {
+        const { lat, lng, type, radius } = req.query;
 
-        const {
-            lat,
-            lng,
-            type
-        } = req.query;
-
-
-        // =========================
-        // VALIDATE LATITUDE
-        // =========================
-
+        // Validate required parameters
         if (!lat) {
             return res.status(400).json({
                 success: false,
                 message: "Latitude is required"
             });
         }
-
-
-        // =========================
-        // VALIDATE LONGITUDE
-        // =========================
 
         if (!lng) {
             return res.status(400).json({
@@ -77,11 +45,6 @@ const searchNearby = async (req, res) => {
             });
         }
 
-
-        // =========================
-        // VALIDATE TYPE
-        // =========================
-
         if (!type) {
             return res.status(400).json({
                 success: false,
@@ -89,85 +52,60 @@ const searchNearby = async (req, res) => {
             });
         }
 
-
         const latitude = Number(lat);
         const longitude = Number(lng);
+        const requestedRadius = Number(radius);
+        const searchRadius = Number.isFinite(requestedRadius) ? requestedRadius : 5000;
 
-
-        if (
-            Number.isNaN(latitude) ||
-            Number.isNaN(longitude)
-        ) {
+        // Validate coordinates
+        if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Latitude and longitude must be numbers"
+                message: "Latitude and longitude must be numbers"
             });
         }
 
-
-        if (
-            latitude < -90 ||
-            latitude > 90
-        ) {
+        if (latitude < -90 || latitude > 90) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid latitude"
             });
         }
 
-
-        if (
-            longitude < -180 ||
-            longitude > 180
-        ) {
+        if (longitude < -180 || longitude > 180) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid longitude"
             });
         }
 
+        // Validate radius
+        if (searchRadius < 1 || searchRadius > 50000) {
+            return res.status(400).json({
+                success: false,
+                message: "Radius must be between 1 and 50000 metres"
+            });
+        }
 
-        // =========================
-        // SEARCH GOOGLE PLACES
-        // =========================
-
-        const places =
-            await searchNearbyPlaces(
-                latitude,
-                longitude,
-                type
-            );
-
+        // Search nearby places
+        const places = await searchNearbyPlaces(
+            latitude,
+            longitude,
+            type,
+            searchRadius
+        );
 
         return res.status(200).json({
-
             success: true,
-
             type,
-
             count: places.length,
-
             places
-
         });
 
     } catch (error) {
-
-        console.error(
-            "Nearby search error:",
-            error
-        );
-
-        return res.status(500).json({
-
+        return res.status(error.statusCode || 500).json({
             success: false,
-
-            message:
-                "Error searching nearby places",
-
-            error: error.message
-
+            message: error.message || "Error searching nearby places"
         });
     }
 };

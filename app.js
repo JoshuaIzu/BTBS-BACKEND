@@ -6,7 +6,7 @@ const morgan = require("morgan");
 
 
 const connectDB = require("./src/config/db");
-const { searchRoutes } = require("./src/controllers/route.controller");
+
 
 app.use(morgan("dev"));
 app.use(cors());
@@ -56,7 +56,8 @@ app.get("/", (req, res) => {
           "POST /api/safety-points": "Create safety point (admin)"
         },
         locations: {
-          "GET /api/locations/search": "Search locations"
+          "GET /api/locations/search": "Search locations by text query (e.g., ?q=Ikeja)",
+          "GET /api/search/locations/nearby": "Search nearby places (e.g., ?lat=6.6018&lng=3.3515&type=hospital&radius=3000)"
         },
         search: {
           "GET /api/search": "General search endpoint"
@@ -68,13 +69,13 @@ app.get("/", (req, res) => {
           "GET /api/places/search": "Search locations by text query (e.g., ?query=Ikeja)",
           "GET /api/places/nearby": "Search nearby places (e.g., ?latitude=6.6018&longitude=3.3515&type=hospital&radius=3000)"
         }
+        }
       },
       authentication: {
         type: "Bearer Token",
         header: "Authorization: Bearer <token>",
         protectedEndpoints: "Most endpoints require valid JWT token"
       }
-    }
   });
 });
 
@@ -95,6 +96,7 @@ app.use("/api/safety-points", require("./src/routes/safetyPoint.routes"));
 app.use("/api/locations/search", require("./src/routes/search.routes"));
 app.use("/api/reports", require("./src/routes/report.routes"));
 app.use("/api", require("./src/routes/search.routes"));
+app.use("/api/places", require("./src/routes/googlePlaces.routes"));
 app.use("/api/places", require("./src/routes/googlePlaces.routes"));
 
 app.listen(PORT, () => {
