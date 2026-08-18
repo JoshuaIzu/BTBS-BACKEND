@@ -146,6 +146,100 @@ const createRouteValidation = [
         }),
 ];
 
+const updateRouteValidation = [
+    body("origin")
+        .optional()
+        .isObject()
+        .withMessage("Origin must be an object"),
+
+    body("origin.placeId")
+        .optional()
+        .notEmpty()
+        .withMessage("Origin place ID is required")
+        .isString()
+        .withMessage("Origin place ID must be a string"),
+
+    body("origin.name")
+        .optional()
+        .notEmpty()
+        .withMessage("Origin name is required")
+        .isString()
+        .withMessage("Origin name must be a string"),
+
+    body("destination")
+        .optional()
+        .isObject()
+        .withMessage("Destination must be an object"),
+
+    body("destination.placeId")
+        .optional()
+        .notEmpty()
+        .withMessage("Destination place ID is required")
+        .isString()
+        .withMessage("Destination place ID must be a string"),
+
+    body("destination.name")
+        .optional()
+        .notEmpty()
+        .withMessage("Destination name is required")
+        .isString()
+        .withMessage("Destination name must be a string"),
+
+    body("vehicleType")
+        .optional()
+        .isIn(["bus", "keke", "taxi"])
+        .withMessage("Invalid vehicle type"),
+
+    body("boardingPoint")
+        .optional()
+        .isObject()
+        .withMessage("Boarding point must be an object"),
+
+    body("boardingPoint.name")
+        .optional()
+        .notEmpty()
+        .withMessage("Boarding point name is required")
+        .isString()
+        .withMessage("Boarding point name must be a string"),
+
+    body("fareLow")
+        .optional()
+        .isNumeric()
+        .withMessage("fareLow must be a number")
+        .custom((value) => {
+            if (Number(value) < 0) {
+                throw new Error("fareLow cannot be negative");
+            }
+            return true;
+        }),
+
+    body("fareHigh")
+        .optional()
+        .isNumeric()
+        .withMessage("fareHigh must be a number")
+        .custom((value, { req }) => {
+            if (Number(value) < 0) {
+                throw new Error("fareHigh cannot be negative");
+            }
+            if (req.body.fareLow !== undefined && Number(value) < Number(req.body.fareLow)) {
+                throw new Error("fareHigh cannot be lower than fareLow");
+            }
+            return true;
+        }),
+
+    body("averageFare")
+        .optional()
+        .isNumeric()
+        .withMessage("averageFare must be a number")
+        .custom((value) => {
+            if (Number(value) < 0) {
+                throw new Error("averageFare cannot be negative");
+            }
+            return true;
+        }),
+];
+
 module.exports = {
     createRouteValidation,
+    updateRouteValidation,
 };

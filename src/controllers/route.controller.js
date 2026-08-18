@@ -358,14 +358,7 @@ const getAllRoutes = async (req, res) => {
 
 const updateRoute = async (req, res) => {
     try {
-        const route = await Route.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            {
-                new: true,
-                runValidators: true,
-            }
-        );
+        const route = await Route.findById(req.params.id);
 
         if (!route) {
             return res.status(404).json({
@@ -374,10 +367,27 @@ const updateRoute = async (req, res) => {
             });
         }
 
+        // Check ownership: business users can only update their own routes
+        if (req.user.role === 'business' && route.createdBy.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only update routes you created",
+            });
+        }
+
+        const updatedRoute = await Route.findByIdAndUpdate(
+            req.params.id,
+            req.body,
+            {
+                new: true,
+                runValidators: true,
+            }
+        );
+
         return res.status(200).json({
             success: true,
             message: "Route updated successfully",
-            route,
+            route: updatedRoute,
         });
     } catch (error) {
         console.error("Update route error:", error);
