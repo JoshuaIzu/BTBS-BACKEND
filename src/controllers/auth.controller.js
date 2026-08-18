@@ -15,6 +15,11 @@ const registerCommuter = async (req, res) => {
     }
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      if (existingUser.role === "business") {
+        return res.status(400).json({
+          message: "An account with this email already exists as a business. Please use a different email or contact support."
+        });
+      }
       return res.status(400).json({ message: "User already exists" });
     }
 
@@ -75,9 +80,12 @@ const registerBusiness = async (req, res) => {
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      return res.status(400).json({
-        message: "Business already exists",
-      });
+      if (existingUser.role === "commuter") {
+        return res.status(400).json({
+          message: "An account with this email already exists as a commuter. Please use a different email or contact support."
+        });
+      }
+      return res.status(400).json({ message: "Business already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -186,7 +194,7 @@ const sendLoginOtp = async (req, res) => {
 };
 
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, expectedRole } = req.body;
 
   try {
     if (!email || !password) {
@@ -210,6 +218,21 @@ const loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
+
+    if (expectedRole && user.role !== expectedRole) {
+      if (expectedRole === "business") {
+        return res.status(403).json({
+          success: false,
+          message: "This account is registered as a commuter. Please use the commuter login."
+        });
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: "This account is registered as a business. Please use the vendor login."
+        });
+      }
+    }
+
     const token = generateToken(user._id, user.role);
 
     const userResponse = {
