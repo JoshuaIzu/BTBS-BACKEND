@@ -197,15 +197,36 @@ const loginUser = async (req, res) => {
   const { email, password, expectedRole } = req.body;
 
   try {
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password are required" });
+    if (!email || !password || !expectedRole) {
+      return res.status(400).json({
+        message: "Email, password and account type are required",
+      });
+    }
+
+    if (!["commuter", "business"].includes(expectedRole)) {
+      return res.status(400).json({
+        message: "Invalid account type",
+      });
     }
 
     const user = await User.findOne({ email });
+
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    // VERY IMPORTANT
+    // Make sure the selected path matches the actual account
+    if (user.role !== expectedRole) {
+      return res.status(403).json({
+        success: false,
+        message:
+          expectedRole === "commuter"
+            ? "This account is registered as a vendor. Please use the vendor login."
+            : "This account is registered as a commuter. Please use the commuter login.",
+      });
     }
 
     if (!user.isVerified) {
@@ -215,22 +236,11 @@ const loginUser = async (req, res) => {
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
 
-    if (expectedRole && user.role !== expectedRole) {
-      if (expectedRole === "business") {
-        return res.status(403).json({
-          success: false,
-          message: "This account is registered as a commuter. Please use the commuter login."
-        });
-      } else {
-        return res.status(403).json({
-          success: false,
-          message: "This account is registered as a business. Please use the vendor login."
-        });
-      }
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid credentials",
+      });
     }
 
     const token = generateToken(user._id, user.role);
@@ -243,9 +253,18 @@ const loginUser = async (req, res) => {
       token,
     };
 
-    res.json({ message: "Login successful", user: userResponse });
+    return res.status(200).json({
+      message: "Login successful",
+      user: userResponse,
+    });
+
   } catch (error) {
-    res.status(500).json({ message: "Error logging in", error: error.message });
+    console.error("Login error:", error);
+
+    return res.status(500).json({
+      message: "Error logging in",
+      error: error.message,
+    });
   }
 };
 

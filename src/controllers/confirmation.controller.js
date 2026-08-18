@@ -459,78 +459,49 @@ const updateConfirmation = async (req, res) => {
     }
 };
 
+
+const updateConfirmation = async (req, res) => {
+    console.log("=== UPDATE CONFIRMATION ===");
+    console.log(req.params);
+    console.log(req.originalUrl);
+    try {
+        const { confirmedFare, verificationStatus } = req.body;
+
+        console.log('Params:', req.params);
+
+        const confirmation = await Confirmation.findById(req.params.confirmationId);
+        console.log('Found:', confirmation);
+        if (!confirmation) {
+            return res.status(404).json({ message: 'Confirmation not found' });
+        }
+        if (confirmation.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'You are not authorized to update this confirmation' });
+        }
+        confirmation.confirmedFare = req.body.confirmedFare || confirmation.confirmedFare;
+        await confirmation.save();
+        res.status(200).json({ message: 'Confirmation updated', confirmation });
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating confirmation', error });
+    }
+};
+
+
 const deleteConfirmation = async (req, res) => {
     try {
-        const confirmationId = req.params.confirmationId;
+        const { confirmationId } = req.params;
 
-        // Validate confirmation ID format
-        if (!mongoose.Types.ObjectId.isValid(confirmationId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid confirmation ID format'
-            });
-        }
-
-        // Find confirmation
-        const confirmation = await Confirmation.findById(confirmationId);
+        const confirmation = await Confirmation.findById(req.params.confirmationId);
         if (!confirmation) {
-            return res.status(404).json({
-                success: false,
-                message: 'Confirmation not found'
-            });
+            return res.status(404).json({ message: 'Confirmation not found' });
         }
-
-        // Authorization: admin only (as per route configuration)
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to delete this confirmation'
-            });
+        if (confirmation.userId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'You are not authorized to delete this confirmation' });
         }
+        await confirmation.deleteOne();
 
-        // Store routeId for recalculation
-        const routeId = confirmation.routeId;
-
-        // Delete only this confirmation (not the route)
-        await Confirmation.findByIdAndDelete(confirmationId);
-
-        // Recalculate route aggregates after deletion
-        await recalculateRouteAggregates(routeId);
-
-        // Get updated route
-        const route = await Route.findById(routeId);
-        const confidence = await calculateConfidenceScore(routeId);
-
-        // Response with success and updated route
-        return res.status(200).json({
-            success: true,
-            message: 'Confirmation deleted successfully',
-            route: {
-                id: route._id,
-                fare: {
-                    low: route.fareLow,
-                    high: route.fareHigh,
-                    average: route.averageFare
-                },
-                confidence: {
-                    score: route.confidenceScore,
-                    level: route.confidenceLevel,
-                    components: confidence.components,
-                    independentReports: confidence.independentReports,
-                    totalReports: confidence.totalReports,
-                    medianFare: confidence.medianFare
-                },
-                totalConfirmations: route.totalConfirmations,
-                lastConfirmedAt: route.lastConfirmedAt
-            }
-        });
+        res.status(200).json({ message: 'Confirmation deleted', confirmation });
     } catch (error) {
-        console.error('Delete confirmation error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Error deleting confirmation',
-            error: error.message
-        });
+        res.status(500).json({ message: 'Error deleting confirmation', error });
     }
 };
 
