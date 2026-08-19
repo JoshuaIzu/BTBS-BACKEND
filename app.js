@@ -121,6 +121,16 @@ app.get("/", (req, res) => {
           "GET /api/places/nearby":
             "Search nearby places",
         },
+
+        listings: {
+          "POST /api/listings": "Create listing (business only)",
+          "GET /api/listings": "Get all listings",
+          "GET /api/listings/my": "Get current user's listings (business only)", "GET /api/listings/:id": "Get listing by ID",
+        },
+
+        uploads: {
+          "POST /api/uploads": "Upload single image (business only)",
+        },
       },
     },
   });
@@ -181,7 +191,8 @@ app.use(
   require("./src/routes/googlePlaces.routes")
 );
 app.use("/api/trips", require("./src/routes/trip.routes"));
-
+app.use("/api/uploads", require("./src/routes/upload.routes"));
+app.use("/api/listings", require("./src/routes/listing.routes"));
 // ==========================================
 // SOCKET EVENTS
 // ==========================================
